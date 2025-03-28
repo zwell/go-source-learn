@@ -164,7 +164,7 @@ func (m *Mutex) lockSlow() {
 }
 ```
 
-##### unlock
+##### Unlock
 
 1、如果不处于饥饿模式，解锁，并尝试唤醒一个等待的 Goroutine
 
