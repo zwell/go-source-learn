@@ -1,5 +1,155 @@
 ### 介绍
 
+Channel 是 Go 语言中一种并发通信机制， 让不同的 goroutine 可以安全地交换数据。 
+
+可以理解为：线程安全的管道。
+
+在 Go 中有一句经典话术：
+
+> "不要通过共享内存来通信，而是通过通信来共享内存。"
+
+#### 核心特性
+
+| 特性 | 说明 |
+|:---|:---|
+| 类型安全 | 每个 channel 都有一个元素类型，比如 `chan int` 只能传 `int`。 |
+| 同步/异步 | 无缓冲 channel 是同步通信，有缓冲 channel 是异步通信。 |
+| 阻塞/唤醒 | send 和 receive 在必要时会阻塞，直到条件满足。 |
+| 关闭(close) | 可以显式关闭 channel，通知接收方数据已发送完。 |
+| 单向通道 | `chan<- T`（只发送）或 `<-chan T`（只接收）。 |
+
+#### 基本操作
+
+| 操作 | 示例 | 说明 |
+|:---|:---|:---|
+| 创建 | `c := make(chan int)` | 创建一个无缓冲 channel |
+| 发送 | `c <- 1` | 往 channel 发送一个值 |
+| 接收 | `v := <-c` | 从 channel 接收一个值 |
+| 关闭 | `close(c)` | 关闭 channel，不能再发送，只能接收 |
+| 非阻塞发送 | `select { case c <- 1: default: }` | 如果不能发送，就走 `default` |
+| 非阻塞接收 | `select { case v := <-c: default: }` | 如果没有数据，就走 `default` |
+
+#### 使用场景
+
+##### goroutine 间传递数据
+
+```go
+c := make(chan int)
+
+go func(){
+    c <- 10	
+}()
+
+v := <-c
+fmt.Println(v) // 10
+```
+
+✅ **应用场景：**
+- 子任务执行完，把结果传回主线程
+- 一边生产数据，一边消费数据（生产者/消费者模型）
+
+#### 控制 goroutine 的退出，同步
+
+```go
+done := make(chan struct{})
+
+go func(){
+    // 业务处理
+	...
+	
+	close(done) // 通知主线程
+}()
+
+<-done // 阻塞等待
+```
+
+✅ **应用场景：**
+- 主协程等待子协程完成
+- 超时控制（配合 `select`）
+- 批量协程并发，然后统一等待（像 WaitGroup）
+
+#### 限制并发数量（信号量模式）
+
+```go
+limit := make(chan struct{}, 3)
+
+for i := 0; i < 10; i++ {
+    limit <- struct{}{}
+    fmt.Println(time.Now())
+    go func() {
+        defer func() { <-limit }()
+        time.Sleep(3 * time.Second)
+    }()
+}
+```
+
+✅ **应用场景：**
+- 限流，比如控制同时访问某服务的 goroutine 数量
+- 爬虫、批量 API 调用
+
+#### 实现超时机制（select + channel）
+
+```go
+c := make(chan int)
+
+go func() {
+    time.Sleep(3 * time.Second)
+    c <- 1
+}()
+
+select {
+case v := <-c:
+    fmt.Println(v)
+case <-time.After(1 * time.Second):
+    fmt.Println("timeout")
+}
+```
+
+✅ **应用场景：**
+- 网络请求超时
+- 等待任务完成，超时后放弃
+
+#### 事件通知、广播
+
+```go
+notify := make(chan struct{})
+
+wg := sync.WaitGroup{}
+
+go func() {
+    time.Sleep(3 * time.Second)
+    close(notify)
+}()
+
+// 任务线程
+wg.Add(10)
+for i := 0; i < 10; i++ {
+    go func() {
+        select {
+        case <-notify:
+            fmt.Printf("receive notify %d\n", i)
+            wg.Done()
+        }
+    }()
+}
+
+wg.Wait()
+```
+
+✅ **应用场景：**
+- 主任务退出，子任务需停止
+
+#### Pipeline（流水线处理）
+
+**多个 goroutine 通过 channel 串联起来，一步步加工数据。**
+
+```go
+
+```
+
+
+#### 结构体
+
 ```go
 type hchan struct {
 	// 通道中当前存储的元素总数
@@ -39,7 +189,7 @@ type hchan struct {
 
 ### 主要方法
 
-##### 创建
+#### 创建
 
 ```go
 func makechan(t *chantype, size int) *hchan {
@@ -81,7 +231,7 @@ func makechan(t *chantype, size int) *hchan {
 }
 ```
 
-##### 发送
+#### 发送
 
 ##### 阻塞发送（正常 `ch <- v`）
 
