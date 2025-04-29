@@ -1,5 +1,33 @@
 ### 介绍
 
+在多个 channel 操作中进行多路复用：即在多个 send、receive 和 default 分支中选择一个可以立即执行的操作。
+
+#### 阻塞 vs 非阻塞
+
+- 阻塞的 select
+
+如果所有 case 都不能立即执行，那么这个 select 会让当前 goroutine 阻塞，直到某个 case 能执行。
+
+```go
+select {
+case msg := <-ch1:
+    fmt.Println("received", msg)
+}
+```
+
+- 非阻塞的 select
+
+如果其他 case 都没法立刻执行（比如通道没数据）， 就立刻走 default 分支，不阻塞。
+
+```go
+select {
+case msg := <-ch1:
+    fmt.Println("received", msg)
+default:
+    fmt.Println("no channel ready, skip")
+}
+```
+
 ### 主要方法
 
 select 关键字的实现
